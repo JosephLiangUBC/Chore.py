@@ -4,6 +4,8 @@ A full Python re-implementation of **Choreography** (Chore.jar) by Rex Kerr,
 the analysis engine used with the Multi-Worm Tracker (MWT).  All built-in
 functions and plugins are replicated as importable Python methods.
 
+This respository is made possible with the assistance of Codex (OpenAI) and Claude (Anthropic).
+
 ---
 
 ## Installation
