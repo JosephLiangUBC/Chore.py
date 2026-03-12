@@ -1,18 +1,30 @@
 # `chore` – Python Port of the Choreography C. elegans Analysis Library
 
-A full Python re-implementation of **Choreography** (Chore.jar) by Rex Kerr,
-the analysis engine used with the Multi-Worm Tracker (MWT).  All built-in
-functions and plugins are replicated as importable Python methods.
+A Python 3 port of major **Choreography** (Chore.jar) analysis functionality by
+Rex Kerr, focused on scriptable access to the Multi-Worm Tracker (MWT)
+analysis pipeline.
 
-This respository is made possible with the assistance of Codex (OpenAI) and Claude (Anthropic).
+This repository is made with the assistance of ChatGPT Codex and Anthropic Claude.
+
+Current scope note: the core analysis library is substantially ported, but the
+Java application's full CLI, plugin-loading, GUI, and some helper APIs are not
+yet feature-complete. See [PARITY_AUDIT.md](/Users/Joseph/Desktop/Chore/choreography/PARITY_AUDIT.md).
 
 ---
 
 ## Installation
 
 ```bash
-pip install numpy scipy pandas scikit-image
+pip install -r requirements.txt
 ```
+
+This installs:
+
+- `numpy==2.2.6`
+- `pandas==2.2.3`
+- `scipy==1.15.3`
+- `Pillow==11.2.1`
+- `matplotlib==3.10.3`
 
 Then place the `chore/` folder on your Python path or install as a package.
 
@@ -47,7 +59,129 @@ df = c.to_dataframe(["speed", "length", "curve", "bias"])
 df.to_csv("results.csv", index=False)
 c.write_dat("speed", output_dir="./out")     # one .dat file per worm
 c.write_summary_table("summary.tsv")
+
+# Render a spatial map directly from Choreography
+img = c.render_map(
+    quantity="speed",
+    color_mapper="rainbow",
+    backgrounder="green",
+    dot_painter="line",
+    width_px=1024,
+    height_px=768,
+)
+img.save("map_speed.png")
 ```
+
+---
+
+## Spatial Map (`--map` equivalent)
+
+`Choreography` now exposes the `DataMapper` workflow directly, so most map
+rendering can happen from the same object you use for loading and analysis.
+`DataMapper` is still available if you want lower-level control.
+
+```python
+from chore import Choreography
+
+# 1. Load the MWT output directory (same as any other analysis)
+c = Choreography(
+    directory="20220601_120000",   # path to folder containing .summary / .blob files
+    mm_per_pixel=0.025,
+    min_duration=5.0,
+    min_move_mm=0.1,
+)
+c.load()
+
+# 2. Render all tracks coloured by speed
+img = c.render_map(
+    quantity="speed",              # any output code: 'speed', 'time', 'curve', etc.
+    color_mapper="grayscale",        # "rainbow" or "sunset", "spatter", "grayscale"
+    backgrounder="black",          # "green" or "white", "black"
+    dot_painter="line",            # "line" or "dot", "circle", "spot", "identity"
+    width_px=1024,
+    height_px=768,
+)
+img.save("map_speed.png")
+
+# 3. Add a colour scale bar
+img_with_bar = c.add_map_colorbar(
+    img,
+    "rainbow",
+    v_min=0.0,
+    v_max=0.5,
+    label="speed (mm/s)",
+)
+img_with_bar.save("map_speed_bar.png")
+
+# 4. Snapshot at a specific time (e.g. 30 s into the recording, 5 s trail)
+img_t = c.render_map_at_time(
+    t=30.0,
+    trail_s=5.0,
+    quantity="speed",
+    color_mapper="grayscale",
+    backgrounder="black",
+    width_px=1024,
+    height_px=768,
+)
+img_t.save("map_t30.png")
+
+# 5. Save an animated GIF of the full recording
+c.save_map_gif(
+    "map_animated.gif",
+    fps=10.0,
+    trail_s=2.0,
+    quantity="speed",
+    color_mapper="grayscale",
+    backgrounder="black",
+    width_px=800,
+    height_px=600,
+)
+
+# 6. Interactive matplotlib viewer (equivalent to the Java GUI)
+c.show_map(quantity="speed", colorbar=True)
+
+# Optional: access the underlying DataMapper instance directly
+dm = c.get_datamapper()
+```
+
+**Colour maps** — pass any of these preset strings as `color_mapper`:
+
+| Class | Description |
+|---|---|
+| `"rainbow"` | Red → green → blue spectral ramp |
+| `"sunset"` | Deep blue → warm orange/red |
+| `"spatter"` | Distinct hue per worm (good for identity) |
+| `"grayscale"` | Grayscale ramp |
+
+**Backgrounds** — pass any of these preset strings as `backgrounder`:
+
+| Class | Description |
+|---|---|
+| `"green"` | Dark green (default, mimics agar plate) |
+| `"white"` | White |
+| `"black"` | Black |
+
+**Painters** — pass any of these preset strings as `dot_painter`:
+
+| Class | Description |
+|---|---|
+| `"line"` | Connected trajectory lines with arrowheads |
+| `"dot"` | Single pixel per frame |
+| `"circle"` | Filled circle of fixed size |
+| `"spot"` | Circle scaled by the quantity value |
+| `"identity"` | Circle plus worm ID |
+| `"frame"` | Circle plus frame number |
+| `"value"` | Circle plus value label |
+
+If you need non-default constructor arguments, you can still access `DataMapper`
+directly through `c.get_datamapper()` and pass explicit mapper/painter objects.
+The default map painter is `DotPainter()`, and `DotPainter()` is invisible by
+default. Use `LinePainter()` explicitly if you want connected trajectory
+segments, or `DotPainter(alpha=100)` if you want faint points.
+
+> **Rendering tiers**: at high zoom (`pixel_size` < 2 screen pixels per data pixel) the
+> body outline or spine is drawn; at medium zoom the bearing axis is shown; at low
+> zoom a crosshair dot is used — exactly matching the Java `--map` behaviour.
 
 ---
 
@@ -135,6 +269,16 @@ cv = c.run_curvature_analysis(span=0.5)
 c.respine(n_points=11)          # resample spines in-place
 c.reoutline()                   # smooth outlines in-place
 c.orient_spines()               # flip spines to head-first
+```
+
+#### Data maps
+
+```python
+img = c.render_map(quantity="speed")
+img_t = c.render_map_at_time(t=30.0, trail_s=5.0, quantity="speed")
+c.save_map_gif("map.gif", quantity="speed", fps=10.0)
+c.show_map(quantity="speed", colorbar=True)
+dm = c.get_datamapper()         # optional low-level access
 ```
 
 ---
@@ -339,5 +483,95 @@ dance  = read_blob_file("20220601_120000_00001.blob")
 | `numpy` | All array operations |
 | `scipy` | Statistical distributions, Gaussian smoothing |
 | `pandas` | DataFrame outputs |
-| `scikit-image` | (optional) image-based outline analysis |
-| `shapely` | (optional) polygon operations in Flux |
+| `Pillow` | Data map image rendering |
+| `matplotlib` | Interactive `show_map()` viewer |
+
+---
+
+## `DataMapper` — the `--map` rendering pipeline
+
+Full Python port of `DataMapper.java`. Renders worm tracks onto a 2-D spatial
+canvas, colouring each position by any scalar quantity.  Replaces the
+interactive Java `DataMapVisualizer` GUI.
+
+```python
+from chore import (DataMapper, RainbowMapper, SunsetMapper, SpatterMapper,
+                   WhiteGrounder, GreenGrounder, BlackBackgrounder, LinePainter)
+
+dm = DataMapper(mm_per_pixel=0.025)
+
+# ── Full track map coloured by speed ─────────────────────────────────────────
+img = dm.render(
+    dances,                         # dict: worm_id → Dance
+    quantity='speed',               # 'time' | 'speed' | 'length' | 'curve' | …
+    v_min=0.0, v_max=0.5,           # normalisation range (None = auto)
+    color_mapper=RainbowMapper(),   # RainbowMapper | SunsetMapper | SpatterMapper
+    backgrounder=WhiteGrounder(),   # WhiteGrounder | GreenGrounder | BlackBackgrounder
+    dot_painter=LinePainter(),      # LinePainter | CirclePainter | SpotPainter | …
+    width_px=1024, height_px=768,
+)
+img.save("speed_map.png")
+
+# ── Snapshot at a specific time (with history trail) ─────────────────────────
+img = dm.render_at_time(dances, t=30.0, trail_s=5.0,
+                         color_mapper=SunsetMapper(),
+                         width_px=800, height_px=800)
+
+# ── Animated outputs ──────────────────────────────────────────────────────────
+dm.save_gif(dances, "tracks.gif", fps=10.0, trail_s=2.0)
+dm.save_frames(dances, "frames/", fps=10.0, trail_s=2.0)   # PNG series
+dm.save_video(dances, "tracks.mp4", fps=10.0, trail_s=2.0) # requires ffmpeg
+
+# ── Colourbar ─────────────────────────────────────────────────────────────────
+img_cb = dm.add_colorbar_to_image(img, RainbowMapper(),
+                                   v_min=0.0, v_max=0.5, label="mm/s")
+
+# ── Overlays (outline / spine / bearing arrows) ───────────────────────────────
+view = dm.render(dances, ...)          # or ViewRequest.auto_bounds(dances, w, h)
+img = dm.overlay_outlines(img, dances, view, t=30.0)
+img = dm.overlay_spines(img, dances, view, t=30.0)
+img = dm.overlay_bearings(img, dances, view, t=30.0)
+
+# ── Interactive matplotlib viewer (replaces DataMapVisualizer) ────────────────
+dm.show(dances, quantity='speed', color_mapper=RainbowMapper(),
+        backgrounder=GreenGrounder(), title="Speed Map")
+```
+
+### Color mappers
+
+| Class | Java equivalent | Description |
+|-------|----------------|-------------|
+| `RainbowMapper` | `RainbowMapper` | red→yellow→green→cyan→blue→magenta cycle |
+| `SunsetMapper` | `SunsetMapper` | deep blue→magenta→orange |
+| `SpatterMapper(entries)` | `SpatterMapper` | pseudo-random distinct hues (good for per-worm ID) |
+| `ColorMapper` | `ColorMapper` | base grayscale mapper |
+
+### Backgrounds
+
+| Class | Java equivalent | Colors |
+|-------|----------------|--------|
+| `BlackBackgrounder` | `Backgrounder` | black bg, white highlights |
+| `GreenGrounder` | `Greengrounder` | dark green bg (MWT-classic look) |
+| `WhiteGrounder` | `Whitegrounder` | white bg, black highlights |
+| `ImageGrounder(path)` | `Imagegrounder` | PNG/JPEG backdrop |
+| `DimImageGrounder(path)` | `Dimimagegrounder` | dimmed backdrop |
+
+### Dot painters
+
+| Class | Java equivalent | Draws |
+|-------|----------------|-------|
+| `LinePainter` | `LinePainter` | connected path + arrowheads |
+| `CirclePainter(d)` | `CirclePainter` | solid circle of diameter d |
+| `SpotPainter(d)` | `SpotPainter` | circle scaled by area |
+| `IdentityPainter(d)` | `IdentityPainter` | circle + worm ID number |
+| `FramePainter(d)` | `FramePainter` | circle + frame index |
+| `ValuePainter(d)` | `ValuePainter` | circle + numeric value |
+| `DotPainter` | `DotPainter` | single pixel (base) |
+
+### Value / quantity codes
+
+All codes from the main `Choreography.get_quantity()` table are supported:
+`'time'`, `'speed'`, `'angular_speed'`, `'length'`, `'width'`, `'aspect'`,
+`'curve'`, `'bias'`, `'path'`, `'kink'`, `'midline'`, `'dir_change'`,
+`'loc_x'`, `'loc_y'`, `'vel_x'`, `'vel_y'`, `'theta'`, `'crab'`, `'qxfw'`,
+`'area'`, `'frame'`.  A callable `(Dance) → np.ndarray` is also accepted.
