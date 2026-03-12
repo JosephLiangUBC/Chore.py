@@ -68,14 +68,37 @@ from .utils          import (Vec2F, Vec2D, Vec2I, Vec2S,
                               wrap_angle, angle_diff,
                               smooth_array, gaussian_smooth,
                               clip, ring_left, ring_right)
-from .measures import (
-    MeasureReversal, detect_reversals, Reversal, ReversalResult,
-    MeasureOmega, OmegaBend,
-    Eigenspine, nipals, EigenSpineResult,
-    Curvaceous,
-    Flux, FluxShape, FluxEvent,
-    MeasureRadii, RadiiProfile,
-    Respine, Reoutline, Extract, SpinesForward,
+
+# from .measures import (
+#     MeasureReversal, detect_reversals, Reversal, ReversalResult,
+#     MeasureOmega, OmegaBend,
+#     Eigenspine, nipals, EigenSpineResult,
+#     Curvaceous,
+#     Flux, FluxShape, FluxEvent,
+#     MeasureRadii, RadiiProfile,
+#     Respine, Reoutline, Extract, SpinesForward,
+# )
+
+from .reversal import MeasureReversal, detect_reversals, Reversal, ReversalResult
+from .omega import MeasureOmega, OmegaBend
+from .eigenspine import Eigenspine, nipals, EigenSpineResult
+from .curvaceous import Curvaceous
+from .spatial import MeasureRadii, RadiiProfile, Flux, FluxShape, FluxEvent, Respine, Reoutline, Extract, SpinesForward
+
+from .datamap import (
+    DataMapper,
+    # Color mappers
+    ColorMapper, RainbowMapper, SunsetMapper, SpatterMapper,
+    # Backgrounds
+    Backgrounder, BlackBackgrounder, GreenGrounder, WhiteGrounder,
+    ImageGrounder, DimImageGrounder,
+    # Dot painters
+    DotPainter, CirclePainter, SpotPainter,
+    IdentityPainter, FramePainter, ValuePainter, LinePainter,
+    # Value sources
+    ValueSource, ValueIdentity, ValueValue,
+    # View
+    ViewRequest,
 )
 
 __all__ = [
@@ -111,4 +134,13 @@ __all__ = [
     "Flux", "FluxShape", "FluxEvent",
     "MeasureRadii", "RadiiProfile",
     "Respine", "Reoutline", "Extract", "SpinesForward",
+    # DataMapper (--map)
+    "DataMapper",
+    "ColorMapper", "RainbowMapper", "SunsetMapper", "SpatterMapper",
+    "Backgrounder", "BlackBackgrounder", "GreenGrounder", "WhiteGrounder",
+    "ImageGrounder", "DimImageGrounder",
+    "DotPainter", "CirclePainter", "SpotPainter",
+    "IdentityPainter", "FramePainter", "ValuePainter", "LinePainter",
+    "ValueSource", "ValueIdentity", "ValueValue",
+    "ViewRequest",
 ]

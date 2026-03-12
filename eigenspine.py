@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..dance import Dance
+    from .dance import Dance
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ class Eigenspine:
 
     def _flatten_spine(self, sp) -> Optional[np.ndarray]:
         """Resample spine to n_spine_points, normalise length, flatten."""
-        from ..utils import resample_polyline, cumulative_arc_length
+        from .utils import resample_polyline, cumulative_arc_length
         pts = sp.points
         if len(pts) < 2:
             return None

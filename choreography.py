@@ -30,13 +30,26 @@ from .statistic import Statistic
 from .fitter import Fitter
 from .io import (load_directory, read_summary, write_dat_file,
                  write_summary_stats, DEFAULT_MM_PER_PIXEL)
-from .measures.reversal  import MeasureReversal
-from .measures.omega     import MeasureOmega
-from .measures.eigenspine import Eigenspine
-from .measures.curvaceous import Curvaceous
-from .measures.spatial   import (Flux, MeasureRadii, Respine,
-                                  Reoutline, Extract, SpinesForward)
 
+# from .measures.reversal  import MeasureReversal
+# from .measures.omega     import MeasureOmega
+# from .measures.eigenspine import Eigenspine
+# from .measures.curvaceous import Curvaceous
+# from .measures.spatial   import (Flux, MeasureRadii, Respine,
+#                                   Reoutline, Extract, SpinesForward)
+
+from .reversal  import MeasureReversal
+from .omega     import MeasureOmega
+from .eigenspine import Eigenspine
+from .curvaceous import Curvaceous
+from .spatial   import (Flux, MeasureRadii, Respine, Reoutline, Extract, SpinesForward)
+from .datamap import (
+    DataMapper,
+    ColorMapper, RainbowMapper, SunsetMapper, SpatterMapper,
+    Backgrounder, BlackBackgrounder, GreenGrounder, WhiteGrounder,
+    DotPainter, CirclePainter, SpotPainter, IdentityPainter,
+    FramePainter, ValuePainter, LinePainter,
+)
 
 # ---------------------------------------------------------------------------
 # Output type codes  (mirrors Choreography "ftnNpsSlLwWaAmkbcXYVUTCqd1234")
@@ -114,6 +127,29 @@ class Choreography:
     DEFAULT_PIXEL_SIZE:   float = 0.025   # mm/pixel
     DEFAULT_SPEED_WINDOW: float = 0.5     # seconds
     DANCERS_PER_FILE:     int   = 1
+    MAP_COLOR_PRESETS = {
+        "rainbow": RainbowMapper,
+        "sunset": SunsetMapper,
+        "spatter": SpatterMapper,
+        "grayscale": ColorMapper,
+        "gray": ColorMapper,
+    }
+    MAP_BACKGROUND_PRESETS = {
+        "green": GreenGrounder,
+        "white": WhiteGrounder,
+        "black": BlackBackgrounder,
+        "none": BlackBackgrounder,
+        "transparent": BlackBackgrounder,
+    }
+    MAP_PAINTER_PRESETS = {
+        "line": LinePainter,
+        "dot": DotPainter,
+        "circle": CirclePainter,
+        "spot": SpotPainter,
+        "identity": IdentityPainter,
+        "frame": FramePainter,
+        "value": ValuePainter,
+    }
 
     def __init__(self,
                  directory:       Optional[Union[str, Path]] = None,
@@ -158,6 +194,7 @@ class Choreography:
         self.angular_speed_stat: Statistic = Statistic()
         self.bias_stat:          Statistic = Statistic()
         self.curve_stat:         Statistic = Statistic()
+        self._datamapper: Optional[DataMapper] = None
 
     # ------------------------------------------------------------------
     # Data loading
@@ -466,6 +503,147 @@ class Choreography:
             if isinstance(p, plugin_type):
                 return p
         return None
+
+    # ------------------------------------------------------------------
+    # Data map rendering
+    # ------------------------------------------------------------------
+
+    def get_datamapper(self, refresh: bool = False) -> DataMapper:
+        """
+        Return a DataMapper configured with this Choreography's calibration.
+        """
+        if refresh or self._datamapper is None:
+            self._datamapper = DataMapper(mm_per_pixel=self.mm_per_pixel)
+        return self._datamapper
+
+    @classmethod
+    def _resolve_color_mapper(cls, mapper: Optional[Union[str, ColorMapper]]) -> Optional[ColorMapper]:
+        if mapper is None or isinstance(mapper, ColorMapper):
+            return mapper
+        if isinstance(mapper, str):
+            factory = cls.MAP_COLOR_PRESETS.get(mapper.strip().lower())
+            if factory is None:
+                raise ValueError(f"Unknown color_mapper preset: {mapper}")
+            return factory()
+        return mapper
+
+    @classmethod
+    def _resolve_backgrounder(cls, backgrounder: Optional[Union[str, Backgrounder]]) -> Optional[Backgrounder]:
+        if backgrounder is None or isinstance(backgrounder, Backgrounder):
+            return backgrounder
+        if isinstance(backgrounder, str):
+            factory = cls.MAP_BACKGROUND_PRESETS.get(backgrounder.strip().lower())
+            if factory is None:
+                raise ValueError(f"Unknown backgrounder preset: {backgrounder}")
+            return factory()
+        return backgrounder
+
+    @classmethod
+    def _resolve_dot_painter(cls, dot_painter: Optional[Union[str, DotPainter]]) -> Optional[DotPainter]:
+        if dot_painter is None or isinstance(dot_painter, DotPainter):
+            return dot_painter
+        if isinstance(dot_painter, str):
+            factory = cls.MAP_PAINTER_PRESETS.get(dot_painter.strip().lower())
+            if factory is None:
+                raise ValueError(f"Unknown dot_painter preset: {dot_painter}")
+            return factory()
+        return dot_painter
+
+    def render_map(self, **kwargs):
+        """
+        Render a composite data map for the currently loaded worms.
+
+        All keyword arguments are forwarded to `DataMapper.render()`
+        except that `dances` is supplied automatically from `self.dances`.
+        """
+        kwargs["color_mapper"] = self._resolve_color_mapper(kwargs.get("color_mapper"))
+        kwargs["backgrounder"] = self._resolve_backgrounder(kwargs.get("backgrounder"))
+        kwargs["dot_painter"] = self._resolve_dot_painter(kwargs.get("dot_painter"))
+        return self.get_datamapper().render(self.dances, **kwargs)
+
+    def render_map_at_time(self, t: float, trail_s: float = 5.0, **kwargs):
+        """
+        Render a time-localized snapshot of the current dataset.
+        """
+        kwargs["color_mapper"] = self._resolve_color_mapper(kwargs.get("color_mapper"))
+        kwargs["backgrounder"] = self._resolve_backgrounder(kwargs.get("backgrounder"))
+        kwargs["dot_painter"] = self._resolve_dot_painter(kwargs.get("dot_painter"))
+        return self.get_datamapper().render_at_time(
+            self.dances,
+            t=t,
+            trail_s=trail_s,
+            **kwargs,
+        )
+
+    def save_map_gif(self,
+                     output_path: Union[str, Path],
+                     fps: float = 10.0,
+                     trail_s: float = 2.0,
+                     **kwargs) -> None:
+        """
+        Save an animated GIF for the currently loaded worms.
+        """
+        kwargs["color_mapper"] = self._resolve_color_mapper(kwargs.get("color_mapper"))
+        kwargs["backgrounder"] = self._resolve_backgrounder(kwargs.get("backgrounder"))
+        kwargs["dot_painter"] = self._resolve_dot_painter(kwargs.get("dot_painter"))
+        self.get_datamapper().save_gif(
+            self.dances,
+            output_path=output_path,
+            fps=fps,
+            trail_s=trail_s,
+            **kwargs,
+        )
+
+    def add_map_colorbar(self,
+                         img,
+                         color_mapper: Union[str, ColorMapper],
+                         v_min: float = 0.0,
+                         v_max: float = 1.0,
+                         label: str = "",
+                         width: int = 24,
+                         margin: int = 6):
+        """
+        Append a colorbar to an image returned by `render_map()`.
+        """
+        color_mapper = self._resolve_color_mapper(color_mapper)
+        return self.get_datamapper().add_colorbar_to_image(
+            img,
+            color_mapper=color_mapper,
+            v_min=v_min,
+            v_max=v_max,
+            label=label,
+            width=width,
+            margin=margin,
+        )
+
+    def show_map(self,
+                 quantity=None,
+                 color_mapper: Optional[Union[str, Any]] = None,
+                 backgrounder: Optional[Union[str, Any]] = None,
+                 dot_painter: Optional[Union[str, Any]] = None,
+                 width_px: int = 900,
+                 height_px: int = 700,
+                 title: str = "Choreography Data Map",
+                 colorbar: bool = True,
+                 **kwargs) -> None:
+        """
+        Show an interactive matplotlib viewer for the current dataset.
+        """
+        color_mapper = self._resolve_color_mapper(color_mapper)
+        backgrounder = self._resolve_backgrounder(backgrounder)
+        dot_painter = self._resolve_dot_painter(dot_painter)
+        self.get_datamapper().show(
+            self.dances,
+            quantity=quantity,
+            color_mapper=color_mapper,
+            backgrounder=backgrounder,
+            dot_painter=dot_painter,
+            width_px=width_px,
+            height_px=height_px,
+            title=title,
+            colorbar=colorbar,
+            **kwargs,
+        )
 
     # ------------------------------------------------------------------
     # Built-in analysis shortcuts

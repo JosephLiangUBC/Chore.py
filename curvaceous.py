@@ -10,7 +10,7 @@ import numpy as np
 from typing import Dict, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..dance import Dance
+    from .dance import Dance
 
 
 class Curvaceous:

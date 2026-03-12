@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..dance import Dance
+    from .dance import Dance
     from .reversal import Reversal
 
 

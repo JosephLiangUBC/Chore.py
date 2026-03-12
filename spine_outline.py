@@ -36,13 +36,15 @@ class SpineData:
     """
 
     def __init__(self, points: np.ndarray,
-                 widths: Optional[np.ndarray] = None):
+                 widths: Optional[np.ndarray] = None,
+                 absolute: bool = False):
         self.points: np.ndarray = np.asarray(points, dtype=np.float32)
         n = len(self.points)
         if widths is not None:
             self.widths: np.ndarray = np.asarray(widths, dtype=np.float32)
         else:
             self.widths = np.zeros(n, dtype=np.float32)
+        self.absolute: bool = absolute
         self._flipped: bool = False
 
     def size(self) -> int:
@@ -84,7 +86,7 @@ class SpineData:
         arc_old = cumulative_arc_length(self.points)
         arc_new = np.linspace(0, arc_old[-1], n)
         w_new = np.interp(arc_new, arc_old, self.widths)
-        return SpineData(pts, w_new)
+        return SpineData(pts, w_new, absolute=self.absolute)
 
     def compact(self) -> None:
         """No-op: data is already compacted."""
@@ -106,8 +108,9 @@ class OutlineData:
     *points* is an (M, 2) float32 array forming a closed polygon.
     """
 
-    def __init__(self, points: np.ndarray):
+    def __init__(self, points: np.ndarray, absolute: bool = False):
         self.points: np.ndarray = np.asarray(points, dtype=np.float32)
+        self.absolute: bool = absolute
 
     def size(self) -> int:
         return len(self.points)

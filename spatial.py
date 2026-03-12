@@ -21,10 +21,10 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..dance import Dance
+    from .dance import Dance
 
-from ..spine_outline import SpineData, OutlineData
-from ..utils import Vec2F, resample_polyline, cumulative_arc_length
+from .spine_outline import SpineData, OutlineData
+from .utils import Vec2F, resample_polyline, cumulative_arc_length
 
 
 # ===========================================================================
